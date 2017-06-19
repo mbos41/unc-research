@@ -6,29 +6,37 @@ import time
 
 os.chdir('/Users/michaelbostwick/Documents/RA')
 
+# Pull in shift start/end from previous/next day for overnight shifts
 def shift_update(shifts, prev_day, next_day):
     shifts = shifts.filter(['agent', 'shift_id', 'shift_start', 'shift_end', 'overnight'])
     normal = shifts[shifts.overnight==0]
     overnight_prev = shifts[shifts.overnight==1]
     overnight_next = shifts[shifts.overnight==2]
-    agent_shifts_prev = pd.read_csv('raw_data/{}_agent_shifts.txt'.format(prev_day), encoding="utf-8-sig")
-    agent_shifts_prev = agent_shifts_prev.filter(['agent', 'shift_start', 'overnight'])
-    agent_shifts_next = pd.read_csv('raw_data/{}_agent_shifts.txt'.format(next_day), encoding="utf-8-sig")
-    agent_shifts_next = agent_shifts_next.filter(['agent', 'shift_end', 'overnight'])
     
-    prev_merge = pd.merge(overnight_prev, agent_shifts_prev, on='agent', how='left')
-    prev_merge = prev_merge[prev_merge.overnight_y != 1].sort_values(['agent', 'overnight_y'], ascending=False).drop_duplicates('agent')
-    prev_merge.loc[prev_merge.shift_start_y.isnull(), 'shift_start_y'] = prev_merge.shift_start_x[prev_merge.shift_start_y.isnull()]
-    prev_merge.drop(['shift_start_x','overnight_y'], axis=1, inplace=True)
-    prev_merge.columns = ['agent', 'shift_id', 'shift_end', 'overnight', 'shift_start']
+    try:
+    	agent_shifts_prev = pd.read_csv('raw_data/{}_agent_shifts.txt'.format(prev_day), encoding="utf-8-sig")
+    	agent_shifts_prev = agent_shifts_prev.filter(['agent', 'shift_start', 'overnight'])
+    	prev_merge = pd.merge(overnight_prev, agent_shifts_prev, on='agent', how='left')
+    	prev_merge = prev_merge[prev_merge.overnight_y != 1].sort_values(['agent', 'overnight_y'], ascending=False).drop_duplicates('agent')
+    	prev_merge.loc[prev_merge.shift_start_y.isnull(), 'shift_start_y'] = prev_merge.shift_start_x[prev_merge.shift_start_y.isnull()]
+    	prev_merge.drop(['shift_start_x','overnight_y'], axis=1, inplace=True)
+    	prev_merge.columns = ['agent', 'shift_id', 'shift_end', 'overnight', 'shift_start']
+    # If previous agent_shifts file doesn't exist, leave unchanged
+    except (OSError):
+    	prev_merge = overnight_prev
     
-    
-    next_merge = pd.merge(overnight_next, agent_shifts_next, on='agent', how='left')
-    next_merge = next_merge[next_merge.overnight_y != 2].sort_values(['agent', 'overnight_y'], ascending=False).drop_duplicates('agent')
-    next_merge.loc[next_merge.shift_end_y.isnull(), 'shift_end_y'] = next_merge.shift_end_x[next_merge.shift_end_y.isnull()]
-    next_merge.drop(['shift_end_x', 'overnight_y'], axis=1, inplace=True)
-    next_merge.columns = ['agent', 'shift_id', 'shift_start', 'overnight', 'shift_end']
-    
+    try:
+    	agent_shifts_next = pd.read_csv('raw_data/{}_agent_shifts.txt'.format(next_day), encoding="utf-8-sig")
+    	agent_shifts_next = agent_shifts_next.filter(['agent', 'shift_end', 'overnight'])
+    	next_merge = pd.merge(overnight_next, agent_shifts_next, on='agent', how='left')
+    	next_merge = next_merge[next_merge.overnight_y != 2].sort_values(['agent', 'overnight_y'], ascending=False).drop_duplicates('agent')
+    	next_merge.loc[next_merge.shift_end_y.isnull(), 'shift_end_y'] = next_merge.shift_end_x[next_merge.shift_end_y.isnull()]
+    	next_merge.drop(['shift_end_x', 'overnight_y'], axis=1, inplace=True)
+    	next_merge.columns = ['agent', 'shift_id', 'shift_start', 'overnight', 'shift_end']
+    # If next agent_shifts file doesn't exist, leave unchanged
+    except (OSError):
+    	next_merge = overnight_next
+    	
     shifts = pd.concat([normal, prev_merge, next_merge])
     
     return shifts, prev_merge
@@ -137,7 +145,6 @@ def file_list():
     return files_short
  
 days = file_list()
-days = days[19:]
 num_files = len(days)
 prob_files = []
 
